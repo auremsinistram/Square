@@ -2,10 +2,25 @@
 // Square.swift
 //
 
+#if os(iOS)
 import UIKit
+#endif
+
+#if os(macOS)
+import Cocoa
+#endif
+
 import Extensions
 
-open class Square: UIControl {
+#if os(iOS)
+public typealias Control = UIControl
+#endif
+
+#if os(macOS)
+public typealias Control = NSControl
+#endif
+
+open class Square: Control {
     
     // MARK: - Public struct
     
@@ -39,7 +54,17 @@ open class Square: UIControl {
     
     // MARK: - Open var
     
+#if os(iOS)
+    
     open var isContinuous = true
+    
+#endif
+    
+#if os(macOS)
+    
+    open var isTracking = false
+    
+#endif
     
     open var value: CGFloat {
         get {
@@ -73,10 +98,14 @@ open class Square: UIControl {
     open var point: CGPoint {
         get {
             let position = thumbLayer.position
-            return CGPoint(
-                x: isUseX ? position.x / frame.width : .nan,
-                y: isUseY ? position.y / frame.height : .nan
-            )
+            let x = isUseX ? position.x / frame.width : .nan
+#if os(iOS)
+            let y = isUseY ? position.y / frame.height : .nan
+#endif
+#if os(macOS)
+            let y = isUseY ? 1.0 - (position.y / frame.height) : .nan
+#endif
+            return CGPoint(x: x, y: y)
         }
         set {
             if isTracking {
@@ -99,9 +128,13 @@ open class Square: UIControl {
         return CALayer()
     }
     
+#if os(iOS)
+    
     open var preferredEdgeInsets: UIEdgeInsets {
         return .zero
     }
+    
+#endif
     
     // MARK: - Private var
     
@@ -125,7 +158,11 @@ open class Square: UIControl {
     
     private lazy var thumbLayer: CALayer = preferredThumbLayer
     
+#if os(iOS)
+    
     private lazy var edgeInsets: UIEdgeInsets = preferredEdgeInsets
+    
+#endif
     
     // MARK: - Public override init
     
@@ -140,6 +177,8 @@ open class Square: UIControl {
     }
     
     // MARK: - Open override func
+    
+#if os(iOS)
     
     open override func layoutSubviews() {
         super.layoutSubviews()
@@ -177,32 +216,111 @@ open class Square: UIControl {
         return bounds.inset(by: edgeInsets).contains(point) ? self : nil
     }
     
+#endif
+    
+#if os(macOS)
+    
+    open override func layout() {
+        super.layout()
+        for trackLayer in trackLayers {
+            trackLayer.frame = bounds
+        }
+        update(with: saved)
+    }
+    
+    open override func mouseDown(with event: NSEvent) {
+        isTracking = true
+        update(with: point(by: event))
+        saved = point
+        sendAction(action, to: target)
+    }
+    
+    open override func mouseDragged(with event: NSEvent) {
+        if !isTracking {
+            return
+        }
+        update(with: point(by: event))
+        saved = point
+        if isContinuous {
+            sendAction(action, to: target)
+        }
+        isDragging = true
+    }
+    
+    open override func mouseUp(with event: NSEvent) {
+        if !isContinuous && isDragging {
+            sendAction(action, to: target)
+        }
+        isDragging = false
+        isTracking = false
+    }
+    
+#endif
+    
     // MARK: - Open func
     
     open func update(with point: CGPoint) {
+        let x = (isUseX ? point.x : 0.5) * frame.width
+#if os(iOS)
+        let y = (isUseY ? point.y : 0.5) * frame.height
+#endif
+#if os(macOS)
+        let y = (isUseY ? (1.0 - point.y) : 0.5) * frame.height
+#endif
         CALayer.performWithoutAnimation {
-            thumbLayer.position = CGPoint(
-                x: (isUseX ? point.x : 0.5) * frame.width,
-                y: (isUseY ? point.y : 0.5) * frame.height
-            )
+            thumbLayer.position = CGPoint(x: x, y: y)
         }
     }
     
     // MARK: - Private func
     
     private func setup() {
+#if os(iOS)
         for trackLayer in trackLayers {
             layer.addSublayer(trackLayer)
         }
         layer.addSublayer(thumbLayer)
+#endif
+#if os(macOS)
+        layer = CALayer()
+        layer?.masksToBounds = false
+        for trackLayer in trackLayers {
+            layer?.addSublayer(trackLayer)
+        }
+        layer?.addSublayer(thumbLayer)
+#endif
     }
+    
+#if os(iOS)
     
     private func point(by touch: UITouch) -> CGPoint {
         let point = touch.location(in: self)
-        let result = CGPoint(
-            x: point.x / frame.width,
-            y: point.y / frame.height
+        return boundedPoint(with: point)
+    }
+    
+#endif
+    
+#if os(macOS)
+    
+    private func point(by event: NSEvent) -> CGPoint {
+        let point = convert(event.locationInWindow, from: nil)
+        return boundedPoint(with: point)
+    }
+    
+#endif
+    
+    private func boundedPoint(with point: CGPoint) -> CGPoint {
+        let x = point.x / frame.width
+        let y = point.y / frame.height
+        let result = CGPoint(x: x, y: y).bounded
+#if os(iOS)
+        return result
+#endif
+#if os(macOS)
+        return CGPoint(
+            x: result.x,
+            y: 1.0 - result.y
         )
-        return result.bounded
+#endif
     }
 }

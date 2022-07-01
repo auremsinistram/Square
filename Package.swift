@@ -5,7 +5,8 @@ import PackageDescription
 let package = Package(
     name: "Square",
     platforms: [
-        .iOS(.v9)
+        .iOS(.v9),
+        .macOS(.v10_10)
     ],
     products: [
         .library(
@@ -18,7 +19,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/auremsinistram/Extensions.git",
-            from: .init(0, 1, 0)
+            from: .init(0, 2, 0)
         )
     ],
     targets: [
